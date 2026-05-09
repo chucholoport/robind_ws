@@ -1,46 +1,56 @@
-FROM osrf/ros:jazzy-desktop
+FROM osrf/ros:kilted-desktop
 
 ENV DEBIAN_FRONTEND=noninteractive
+ENV ROS_DISTRO=kilted
+ENV COLCON_WS=/ws/ur_gz_ws
 
-# Core dev tools
-RUN apt update && apt install -y \
-    python3-colcon-common-extensions \
-    python3-rosdep \
-    python3-pip \
+SHELL ["/bin/bash", "-c"]
+
+# Base tooling (ROS image already includes most things)
+RUN apt-get update && apt-get install -y \
     git \
-    nano \
-    tmux \
-    iputils-ping \
-    ros-jazzy-rplidar-ros \
-    ros-jazzy-ros-gz \
-    ros-jazzy-xacro \
-    ros-jazzy-joint-state-publisher \
-    ros-jazzy-robot-state-publisher \
-    ros-jazzy-ros2-control \
-    ros-jazzy-ros2-controllers \
-    ros-jazzy-controller-manager \
+    python3-colcon-common-extensions \
+    python3-vcstool \
+    python3-rosdep \
+    lsb-release \
+    wget \
     && rm -rf /var/lib/apt/lists/*
 
-# Initialize rosdep
-RUN rosdep init || true
+# Official Gazebo (gz) packages for ROS 2 integration
+RUN apt-get update && apt-get install -y \
+    ros-${ROS_DISTRO}-ros-gz \
+    ros-${ROS_DISTRO}-gz-ros2-control \
+    && rm -rf /var/lib/apt/lists/*
+
+# rosdep
 RUN rosdep update
 
-# Clone TurtleBot3 (fixed version)
-RUN git clone -b jazzy https://github.com/ROBOTIS-GIT/turtlebot3.git /ros2_ws/src/turtlebot3 && \
-    git clone -b jazzy https://github.com/ROBOTIS-GIT/turtlebot3_msgs.git /ros2_ws/src/turtlebot3_msgs && \
-    git clone -b jazzy https://github.com/ROBOTIS-GIT/turtlebot3_simulations.git /ros2_ws/src/turtlebot3_simulations
-
-# Clone UR Robotics
-RUN git clone -b jazzy https://github.com/UniversalRobots/Universal_Robots_ROS2_Description.git /ros2_ws/src/ur_description && \
-    git clone -b kilted https://github.com/UniversalRobots/Universal_Robots_ROS2_GZ_Simulation.git /ros2_ws/src/ur_simulation_gz
-
 # Workspace
-WORKDIR /ros2_ws
+RUN mkdir -p ${COLCON_WS}/src
+WORKDIR ${COLCON_WS}
 
-# Ensure ROS environment always available
-SHELL ["/bin/bash", "-c"]
-RUN echo "source /opt/ros/jazzy/setup.bash" >> /root/.bashrc && \
-    echo "export TURTLEBOT3_MODEL=burger" >> /root/.bashrc && \
-    echo "export GAZEBO_MODEL_PATH=\$GAZEBO_MODEL_PATH:/ros2_ws/src/turtlebot3_simulations/turtlebot3_gazebo/models" >> /root/.bashrc
+# Clone UR simulation repo
+RUN git clone -b kilted \
+    https://github.com/UniversalRobots/Universal_Robots_ROS2_GZ_Simulation.git \
+    src/ur_simulation_gz
 
-CMD ["bash"]
+# Dependencies (handled by rosdep as in official workflow)
+RUN source /opt/ros/${ROS_DISTRO}/setup.bash && \
+    apt-get update && \
+    rosdep install \
+    --from-paths src \
+    --ignore-src \
+    -r \
+    -y
+
+# Build workspace
+RUN source /opt/ros/${ROS_DISTRO}/setup.bash && \
+    colcon build --symlink-install
+
+# Environment
+RUN echo "source /opt/ros/${ROS_DISTRO}/setup.bash" >> /root/.bashrc && \
+    echo "source ${COLCON_WS}/install/setup.bash" >> /root/.bashrc
+
+WORKDIR ${COLCON_WS}
+
+CMD ["/bin/bash"]
