@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+
+set -e
+
+# Script & Project directories
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+
+# Load config (same directory)
+CONFIG_FILE="$SCRIPT_DIR/.config"
+if [ ! -f "$CONFIG_FILE" ]; then
+    echo "ERROR: Missing config file: $CONFIG_FILE"
+    exit 1
+fi
+source "$CONFIG_FILE"
+
+# Docker-compose directory
+COMPOSE_DIR="$PROJECT_ROOT/$COMPOSE_SUBDIR"
+
+cd "$COMPOSE_DIR"
+
+echo "Stopping and removing container: $CONTAINER_NAME"
+
+# Stop and remove containers, networks, and volumes
+docker compose down -v
+
+# Remove image (if exists)
+echo "Removing image: $IMAGE_NAME"
+docker rmi -f ${IMAGE_NAME} 2>/dev/null || true
+
+# Cleanup dangling images only
+echo "Cleaning dangling images..."
+docker image prune -f
+
+echo "Done. Space reclaimed."

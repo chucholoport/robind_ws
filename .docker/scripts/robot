@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+
+set -e
+
+# Script & Project directories
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+
+cmd="$1"
+
+case "$cmd" in
+    dev)
+        exec "$SCRIPT_DIR/dev"
+        ;;
+
+    rm)
+        exec "$SCRIPT_DIR/rm"
+        ;;
+
+    *)
+        echo "Usage:"
+        echo "  robot dev   → start dev container"
+        echo "  robot rm    → remove container and free space"
+        ;;
+esac
